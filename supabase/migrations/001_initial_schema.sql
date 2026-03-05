@@ -16,6 +16,9 @@ begin
   insert into public.profiles (id, name)
   values (new.id, new.raw_user_meta_data->>'name');
   return new;
+exception when others then
+  raise warning 'handle_new_user failed for user %: %', new.id, sqlerrm;
+  return new; -- allow signup to proceed even if profile creation fails
 end;
 $$ language plpgsql security definer;
 
@@ -31,7 +34,7 @@ create table public.pets (
   name text not null,
   species text not null check (species in ('cat', 'dog', 'other')),
   breed text,
-  age int check (age >= 0),
+  age int check (age >= 0), -- age in months
   gender text not null check (gender in ('male', 'female')),
   description text,
   status text not null default 'available' check (status in ('available', 'pending', 'adopted')),
@@ -52,6 +55,8 @@ create table public.applications (
   unique(user_id, pet_id)
 );
 
+create index on public.applications(pet_id);
+
 -- ============================================================
 -- Row Level Security
 -- ============================================================
@@ -64,6 +69,11 @@ create policy "Users can view own profile"
   on public.profiles for select using (auth.uid() = id);
 create policy "Users can update own profile"
   on public.profiles for update using (auth.uid() = id);
+
+-- Admins can view all profiles (needed for application review)
+create policy "Admins can view all profiles"
+  on public.profiles for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 -- Pets: anyone can read; only admins can write
 create policy "Anyone can view pets"

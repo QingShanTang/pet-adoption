@@ -13,3 +13,19 @@ create policy "Admins can upload pet images"
 create policy "Anyone can view pet images"
   on storage.objects for select
   using (bucket_id = 'pet-images');
+
+-- Allow admins to replace pet images
+create policy "Admins can update pet images"
+  on storage.objects for update
+  using (
+    bucket_id = 'pet-images' and
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Allow admins to delete pet images
+create policy "Admins can delete pet images"
+  on storage.objects for delete
+  using (
+    bucket_id = 'pet-images' and
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
